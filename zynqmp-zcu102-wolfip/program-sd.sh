@@ -13,7 +13,9 @@
 # so the signed image is dd'd to the start of p2 (this needs root). Copying
 # BOOT.BIN into the FAT p1 does not.
 #
-# Usage:  SD=/dev/sdX ./program-sd.sh        (X = your card reader, NOT a board)
+# Usage:  SD=/dev/sdX ./program-sd.sh         (X = your card reader, NOT a board)
+#         WIPE_OFP_B=1 SD=/dev/sdX ./program-sd.sh   also zero OFP_B so the board
+#                                     boots A:v1 fresh (for a clean A->B update demo)
 #
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,18 +28,31 @@ SD="${SD:?set SD=/dev/sdX (your SD card reader block device - double-check with 
 [ -f "$SIGNED" ]       || { echo "missing $SIGNED - run ./build.sh first" >&2; exit 1; }
 [ -b "$SD" ]           || { echo "$SD is not a block device" >&2; exit 1; }
 
+# Partition node suffix: /dev/sdX -> sdX1 ; /dev/mmcblkN|nvmeN|loopN -> ...p1
+case "$SD" in
+    *[0-9]) P="p" ;;
+    *)      P=""  ;;
+esac
+
 echo "Target $SD:"; lsblk -o NAME,SIZE,TYPE,LABEL,FSTYPE "$SD"
-read -r -p "Write BOOT.BIN to ${SD}1 (FAT) and the signed app to ${SD}2 (raw)? [y/N] " a
+read -r -p "Write BOOT.BIN to ${SD}${P}1 (FAT) and the signed app to ${SD}${P}2 (raw)? [y/N] " a
 [ "$a" = y ] || { echo "aborted"; exit 1; }
 
-echo "== BOOT.BIN -> ${SD}1 (FAT boot partition) =="
+echo "== BOOT.BIN -> ${SD}${P}1 (FAT boot partition) =="
 MNT="$(mktemp -d)"
-sudo mount "${SD}1" "$MNT"
+sudo mount "${SD}${P}1" "$MNT"
 sudo cp "$OUT/BOOT.BIN" "$MNT/BOOT.BIN"
 sync; sudo umount "$MNT"; rmdir "$MNT"
 
-echo "== signed app -> ${SD}2 (OFP_A, raw) =="
-sudo dd if="$SIGNED" of="${SD}2" bs=1M conv=fsync status=progress
+echo "== signed app -> ${SD}${P}2 (OFP_A, raw) =="
+sudo dd if="$SIGNED" of="${SD}${P}2" bs=1M conv=fsync status=progress
+
+# Clean slate: zero the start of OFP_B so wolfBoot sees no valid update there
+# (version 0) and boots A:v1, ready for a fresh A->B update demo.
+if [ "${WIPE_OFP_B:-0}" = 1 ]; then
+    echo "== wiping OFP_B header -> ${SD}${P}3 =="
+    sudo dd if=/dev/zero of="${SD}${P}3" bs=1M count=1 conv=fsync status=none
+fi
 
 sync
 echo "Done. Put the card in the ZCU102, set SW6=SD, and power on."
