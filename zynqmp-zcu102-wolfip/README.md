@@ -15,7 +15,7 @@ BootROM -> FSBL -> PMUFW -> BL31 (ATF, EL3) -> wolfBoot (EL2) -> wolfIP app (EL2
 ## Prerequisites
 
 - **wolfBoot** - the `../wolfBoot` submodule: `git submodule update --init --recursive wolfBoot`
-- **wolfIP** - a sibling clone of [wolfssl/wolfip](https://github.com/wolfSSL/wolfip) (the AMD/Xilinx ports + the ZCU102 OTA support): `git clone https://github.com/wolfSSL/wolfip ../../wolfip` (override with `WOLFIP=/path/to/wolfip`).
+- **wolfIP** - a sibling clone of [wolfSSL/wolfip](https://github.com/wolfSSL/wolfip) (the AMD/Xilinx ports + the ZCU102 OTA support): `git clone https://github.com/wolfSSL/wolfip ../../wolfip` (override with `WOLFIP=/path/to/wolfip`).
 - **FSBL / PMUFW / BL31** - build these for the ZCU102 yourself; they are board- and tool-specific. FSBL + PMUFW come from Vitis/PetaLinux for the ZCU102; BL31 from Arm Trusted Firmware (`make PLAT=zynqmp RESET_TO_BL31=1`). Put `zynqmp_fsbl.elf`, `pmufw.elf`, `bl31.elf` in one directory and pass `FW=/that/dir`.
 - **Toolchain + tools** - the `aarch64-none-elf-` (bare-metal newlib) GCC and `bootgen` (Vitis) on `PATH`.
 

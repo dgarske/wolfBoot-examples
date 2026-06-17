@@ -40,9 +40,12 @@ read -r -p "Write BOOT.BIN to ${SD}${P}1 (FAT) and the signed app to ${SD}${P}2 
 
 echo "== BOOT.BIN -> ${SD}${P}1 (FAT boot partition) =="
 MNT="$(mktemp -d)"
+# Ensure the partition is unmounted and the temp dir removed even if a step
+# below fails under 'set -e' or the script is interrupted.
+trap 'sudo umount "$MNT" 2>/dev/null || true; rmdir "$MNT" 2>/dev/null || true' EXIT
 sudo mount "${SD}${P}1" "$MNT"
 sudo cp "$OUT/BOOT.BIN" "$MNT/BOOT.BIN"
-sync; sudo umount "$MNT"; rmdir "$MNT"
+sync
 
 echo "== signed app -> ${SD}${P}2 (OFP_A, raw) =="
 sudo dd if="$SIGNED" of="${SD}${P}2" bs=1M conv=fsync status=progress

@@ -24,6 +24,7 @@ PORT="${PORT:-7}"   # the app's UDP echo/control port
 
 [ -f "$IMG" ]       || { echo "ERROR: $IMG not found - run ./build.sh first" >&2; exit 1; }
 [ -d "$TFTP_ROOT" ] || { echo "ERROR: TFTP_ROOT $TFTP_ROOT is not a directory - start a TFTP server or set TFTP_ROOT=" >&2; exit 1; }
+[ -w "$TFTP_ROOT" ] || { echo "ERROR: TFTP_ROOT $TFTP_ROOT not writable by $(id -un) - fix perms or set TFTP_ROOT= to a writable dir" >&2; exit 1; }
 command -v nc >/dev/null || { echo "ERROR: 'nc' (netcat) not found" >&2; exit 1; }
 
 echo "Staging $(basename "$IMG") -> $TFTP_ROOT/wolfip_update.bin"

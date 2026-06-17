@@ -12,7 +12,7 @@
 # Dependencies (see README.md):
 #   - wolfBoot: the ../wolfBoot submodule
 #               (git submodule update --init --recursive)
-#   - wolfIP:   a sibling clone of wolfssl/wolfip (default ../../wolfip)
+#   - wolfIP:   a sibling clone of wolfSSL/wolfip (default ../../wolfip)
 #   - FSBL/PMUFW/BL31: build for the ZCU102 with Vitis/PetaLinux; point FW= at them
 #   - aarch64-none-elf toolchain and bootgen (Vitis) on PATH
 # Override any path with the matching env var.
@@ -32,7 +32,7 @@ mkdir -p "$OUT"
 
 # Fail fast on missing dependencies (clearer than a build error halfway through).
 [ -d "$WOLFBOOT/src" ] || { echo "ERROR: wolfBoot not at $WOLFBOOT - run: git submodule update --init --recursive" >&2; exit 1; }
-[ -d "$APPDIR" ]       || { echo "ERROR: wolfIP port not at $APPDIR - clone wolfssl/wolfip as a sibling or set WOLFIP=" >&2; exit 1; }
+[ -d "$APPDIR" ]       || { echo "ERROR: wolfIP port not at $APPDIR - clone wolfSSL/wolfip as a sibling or set WOLFIP=" >&2; exit 1; }
 [ -f "$FW/zynqmp_fsbl.elf" ] || { echo "ERROR: FSBL/PMUFW/BL31 not in $FW - build them (see README) and set FW=" >&2; exit 1; }
 
 echo "== 1/3  wolfBoot (ZynqMP SD, RSA4096/SHA3) =="
@@ -41,8 +41,8 @@ cp "$WOLFBOOT/config/examples/zynqmp_sdcard.config" "$WOLFBOOT/.config"
 # build generates the signing key, reused so a v2 update verifies against the
 # same wolfBoot. If a stale key with a different algorithm is present, run
 # 'make keysclean' in wolfBoot once.
-( cd "$WOLFBOOT" && make keytools >/dev/null \
-    && make clean >/dev/null 2>&1 || true )
+( cd "$WOLFBOOT" && make keytools >/dev/null )
+( cd "$WOLFBOOT" && make clean >/dev/null 2>&1 || true )
 ( cd "$WOLFBOOT" && make CROSS_COMPILE="$CROSS" wolfboot.elf )
 cp "$WOLFBOOT/wolfboot.elf" "$OUT/"
 
@@ -62,7 +62,12 @@ KEY="$WOLFBOOT/wolfboot_signing_private_key.der"
 cp "$OUT/wolfip_app_v${UPDATE_VERSION}_signed.bin" "$OUT/wolfip_update.bin"
 
 echo "== 3/3  BOOT.BIN (FSBL+PMUFW+BL31+wolfBoot) =="
-sed -e "s|@FW@|$FW|g" -e "s|@WOLFBOOT@|$OUT|g" "$HERE/boot.bif.in" > "$OUT/boot.bif"
+# Escape the replacement strings: '\', '&' and the '|' delimiter are special to
+# sed's RHS, so a path containing them would otherwise corrupt boot.bif.
+sed_escape() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
+sed -e "s|@FW@|$(sed_escape "$FW")|g" \
+    -e "s|@WOLFBOOT@|$(sed_escape "$OUT")|g" \
+    "$HERE/boot.bif.in" > "$OUT/boot.bif"
 bootgen -arch zynqmp -image "$OUT/boot.bif" -w on -o "$OUT/BOOT.BIN"
 
 echo
