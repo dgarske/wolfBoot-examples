@@ -12,8 +12,14 @@ target_include_directories(app PRIVATE
 target_sources(app PRIVATE
     ${ZEPHYR_WOLFSSL_MODULE_DIR}/wolfcrypt/benchmark/benchmark.c)
 
-# benchmark.c carries its own main() for standalone use; this app has one.
-# NOTE: this also compiles out wolfcrypt_benchmark_main() and the option
-# tables (benchmark.c lines 18780-19294), so the algorithm selection cannot be
-# driven by arguments - see the comment in src/main.c.
-zephyr_compile_definitions(NO_MAIN_DRIVER)
+# Select the algorithm set the same way the A55 container does, by argument.
+# Two things are needed for that, and NO_MAIN_DRIVER is deliberately not one of
+# them: it would remove wolfcrypt_benchmark_main() and the option tables along
+# with main(). Rename main() instead, and ask wolfSSL to leave the parsing in -
+# its Zephyr block defines MAIN_NO_ARGS by default because most applications
+# have no argv to give it.
+zephyr_compile_definitions(WOLFSSL_ZEPHYR_MAIN_ARGS)
+set_source_files_properties(
+    ${ZEPHYR_WOLFSSL_MODULE_DIR}/wolfcrypt/benchmark/benchmark.c
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    PROPERTIES COMPILE_DEFINITIONS "main=wolfcrypt_bench_unused_main")

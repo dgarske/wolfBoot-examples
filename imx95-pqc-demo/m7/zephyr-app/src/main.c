@@ -64,13 +64,9 @@
  * takes the same argv the command-line version does, so "-pq" restricts it to
  * the post-quantum algorithms - the ones this demo is about, and the ones that
  * finish in a sensible time on an 800 MHz in-order core. */
-/* Selection by argument is not available here: wolfcrypt/settings.h defines
- * MAIN_NO_ARGS for every Zephyr build, and NO_MAIN_DRIVER (needed so this app
- * keeps its own main) removes wolfcrypt_benchmark_main() and the option tables
- * outright. benchmark_test() ignores what it is passed. So the algorithm set
- * is whatever the build enables - which is why prj.conf turns on only ML-KEM
- * and ML-DSA. */
-extern int benchmark_test(void *args);
+/* wolfCrypt's stock benchmark. benchmark_test() ignores what it is passed, so
+ * the entry point that parses arguments is the one to call. */
+extern int wolfcrypt_benchmark_main(int argc, char **argv);
 LOG_MODULE_REGISTER(wolfboot_openamp, LOG_LEVEL_DBG);
 
 /* --- Must match wolfBoot's resource table (hal/imx95_m7.c) --- */
@@ -509,7 +505,19 @@ int main(void)
 
 
         ring_puts("\r\n--- wolfCrypt post-quantum benchmark, Cortex-M7 ---\r\n");
-        (void)benchmark_test(NULL);
+        /* The post-quantum half of what the A55 container runs
+         * (container/entrypoint.sh), so the two cores report the same
+         * algorithms in the same units. The container also covers ECC, RSA and
+         * the hashes; those are left to it, because on this core they add
+         * minutes to a demo whose point is the PQC comparison. */
+        static char *bench_argv[] = {
+            "benchmark",
+            "-ml-kem-512", "-ml-kem-768", "-ml-kem-1024",
+            "-ml-dsa-44", "-ml-dsa-65", "-ml-dsa-87"
+        };
+
+        (void)wolfcrypt_benchmark_main(
+            (int)(sizeof(bench_argv) / sizeof(bench_argv[0])), bench_argv);
     }
     ring_puts("--- end of Cortex-M7 benchmark ---\r\n");
 
