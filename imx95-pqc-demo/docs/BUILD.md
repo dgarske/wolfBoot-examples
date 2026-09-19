@@ -213,10 +213,10 @@ Two things bite when reloading M7 firmware. The core cannot be stopped once wolf
 
 ```
 scp -r ../demo <board>:~/demo
-ssh <board> "~/demo/install-autostart.sh"
+ssh <board> "sudo bash ~/demo/install-autostart.sh"
 ```
 
-That installs systemd units which start the M7 and stream both cores' output to the console on every boot.
+That installs two systemd units: one starts the Cortex-M7 through `remoteproc`, the other streams both cores' output to the serial console on every boot. Pass `--display` instead if you have a DisplayPort screen attached and want the two-pane renderer, or `--off` to disable the demo and get the login prompt back.
 
 ## Recovery
 
