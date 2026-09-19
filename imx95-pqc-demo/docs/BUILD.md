@@ -77,9 +77,62 @@ python3 -c "d=open('/path/to/key.der','rb').read(); open('pub.der','wb').write(d
 ML_DSA_LEVEL=5 ./tools/keytools/keygen --ml_dsa -i pub.der --der
 ```
 
-## 3. Sign the Linux FIT
+## 3. Build and sign the Linux FIT
 
-The payload is a FIT image holding the kernel, device tree and initramfs. Build it however your distribution does - for Torizon it comes out of the BSP - then sign it with the same key wolfBoot was built with:
+The payload is a FIT (Flattened Image Tree) holding the kernel, device tree and initramfs. Take the three components off the running board - they are whatever the distribution installed - and bundle them:
+
+```
+scp <board>:/boot/ostree/torizon-*/vmlinuz-* .
+scp <board>:/boot/ostree/torizon-*/initramfs-* .
+scp <board>:/boot/ostree/torizon-*/dtb/imx95-toradex-smarc-dev.dtb .
+gunzip -c vmlinuz-* > Image
+```
+
+The kernel in `/boot` is gzip-compressed; the FIT wants the flat `Image`. Write `fit.its` describing the three:
+
+```
+/dts-v1/;
+/ {
+    description = "Kernel FIT for wolfBoot verified boot";
+    #address-cells = <1>;
+    images {
+        kernel {
+            data = /incbin/("Image");
+            type = "kernel";  arch = "arm64";  os = "linux";
+            compression = "none";
+            load = <0xB2000000>;  entry = <0xB2000000>;
+        };
+        fdt {
+            data = /incbin/("imx95-toradex-smarc-dev.dtb");
+            type = "flat_dt";  arch = "arm64";  compression = "none";
+            load = <0xB8000000>;
+        };
+        ramdisk {
+            data = /incbin/("initramfs-6.6.142-7.7.0.img");
+            type = "ramdisk";  arch = "arm64";  os = "linux";
+            compression = "none";
+        };
+    };
+    configurations {
+        default = "conf";
+        conf { kernel = "kernel"; fdt = "fdt"; ramdisk = "ramdisk"; };
+    };
+};
+```
+
+The load addresses put the kernel and device tree in DRAM clear of the regions BL31, OP-TEE and wolfBoot occupy. Then build it with `mkimage` from `u-boot-tools`:
+
+```
+mkimage -f fit.its fitImage
+```
+
+The FIT records a build timestamp, so two builds of identical inputs differ in three bytes. Set `SOURCE_DATE_EPOCH` if you want a reproducible result:
+
+```
+SOURCE_DATE_EPOCH=$(date +%s) mkimage -f fit.its fitImage
+```
+
+Now sign it with the same key wolfBoot was built with:
 
 ```
 ML_DSA_LEVEL=5 IMAGE_HEADER_SIZE=12288 \
