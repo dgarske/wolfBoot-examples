@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Write a boot-partition image to the target's eMMC over ssh, and verify it.
+#
+# The i.MX95 boot ROM reads its AHAB container set from whichever eMMC boot
+# partition EXT_CSD selects. Writing the one that is NOT currently selected is
+# safe: the board still boots the other one until you switch deliberately with
+# emmc-select-boot.sh.
+#
+# Usage:
+#   BOARD=user@host emmc-write-boot.sh <image> [0|1]      # default 1 = boot1
+#
+# sudo on the target must be usable; this deliberately embeds no password. Use
+# an ssh key and either passwordless sudo or an askpass helper.
+set -euo pipefail
+
+BOARD="${BOARD:?set BOARD=user@host}"
+IMG="${1:?usage: BOARD=user@host $0 <image> [0|1]}"
+PART="${2:-1}"
+case "$PART" in 0|1) ;; *) echo "partition must be 0 or 1" >&2; exit 1 ;; esac
+DEV="/dev/mmcblk0boot$PART"
+
+[ -f "$IMG" ] || { echo "missing: $IMG" >&2; exit 1; }
+LOCAL_MD5=$(md5sum "$IMG" | cut -d' ' -f1)
+echo "image  : $IMG ($(stat -c %s "$IMG") bytes, md5 $LOCAL_MD5)"
+echo "target : $BOARD $DEV"
+
+echo "== which partition does the ROM boot from now? =="
+ssh "$BOARD" "sudo mmc extcsd read /dev/mmcblk0 2>/dev/null | grep -i 'PARTITION_CONFIG'" || true
+
+echo "== staging =="
+scp -q "$IMG" "$BOARD:/tmp/boot-image.bin"
+ssh "$BOARD" 'sync'
+
+echo "== writing =="
+ssh "$BOARD" "sudo sh -c '
+    set -e
+    echo 0 > /sys/block/mmcblk0boot$PART/force_ro
+    dd if=/tmp/boot-image.bin of=$DEV bs=1M conv=fsync status=none
+    sync
+    echo 1 > /sys/block/mmcblk0boot$PART/force_ro
+'"
+
+echo "== verifying readback =="
+REMOTE_MD5=$(ssh "$BOARD" "sudo dd if=$DEV bs=1M count=32 2>/dev/null | md5sum | cut -d' ' -f1")
+ssh "$BOARD" 'rm -f /tmp/boot-image.bin'
+if [ "$LOCAL_MD5" != "$REMOTE_MD5" ]; then
+    echo "MD5 MISMATCH: local $LOCAL_MD5, board $REMOTE_MD5" >&2
+    exit 1
+fi
+echo "OK - readback matches ($REMOTE_MD5)"
+echo "Nothing about the boot path changed yet; use emmc-select-boot.sh for that."
