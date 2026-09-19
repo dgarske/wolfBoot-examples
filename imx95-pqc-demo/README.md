@@ -167,6 +167,19 @@ A55.** They derive from the 24 MHz generic timer rather than the 1.8 GHz core
 clock and are wrong by roughly 75x. Use ops/sec and MB/s, or pass
 `-freq 1800000000`. The demo renderer strips those columns for this reason.
 
+## Documentation
+
+- [docs/BUILD.md](docs/BUILD.md) - building the demo from a stock module, end to end
+- [docs/BOOT-WALKTHROUGH.md](docs/BOOT-WALKTHROUGH.md) - the boot explained stage by stage, and how to switch between the stock and wolfBoot chains
+
+## Tools
+
+- `tools/ahab-extract.py` - list or extract the images in an AHAB container set
+- `tools/ahab-pack-container2.sh` - build container 2 (BL31, BL33, OP-TEE) into a boot image
+- `tools/ahab-replace-spl.py` - put a wolfBoot stage 1 in the U-Boot SPL slot
+- `tools/emmc-write-boot.sh` - write and verify an eMMC boot partition over ssh
+- `tools/emmc-select-boot.sh` - choose which boot partition the boot ROM loads
+
 ## Support
 
 wolfSSL is dual licensed under GPLv3 or a commercial license. Questions:
